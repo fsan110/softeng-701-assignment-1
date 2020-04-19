@@ -1,10 +1,11 @@
-package com.feeder.server.provider.hackernews;
+package com.feeder.server.provider.weather;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.feeder.server.model.HackerNewsData;
+import com.feeder.server.ApplicationProperties;
+import com.feeder.server.model.WeatherData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,13 +17,14 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
+@WebFluxTest(controllers = WeatherDataProvider.class)
 @ExtendWith(MockitoExtension.class)
-@WebFluxTest(controllers = HackerNewsFeedProvider.class)
-public class HackerNewsFeedProviderTest {
+public class WeatherFeedProviderTest {
 
   @MockBean private WebClient mockWebClient;
-  @Autowired private HackerNewsFeedProvider subject;
-  @Mock private HackerNewsData mockData;
+  @Autowired private WeatherDataProvider subject;
+  @Mock private WeatherData mockData;
+  @MockBean private ApplicationProperties applicationProperties;
 
   @BeforeEach
   public void setUp() {
@@ -32,7 +34,7 @@ public class HackerNewsFeedProviderTest {
   @Test
   public void testGetFeed() {
     // arrange
-    int expectedFeedSize = 5;
+    int expectedFeedSize = 1;
 
     WebClient.RequestHeadersUriSpec mockRequestHeadersUriSpec =
         mock(WebClient.RequestHeadersUriSpec.class);
@@ -41,20 +43,14 @@ public class HackerNewsFeedProviderTest {
 
     when(mockWebClient.get()).thenReturn(mockRequestHeadersUriSpec);
     when(mockRequestHeadersUriSpec.uri(
-            "https://hacker-news.firebaseio.com/v0/askstories.json?print=pretty"))
+            "https://api.openweathermap.org/data/2.5/weather?q=auckland&appid="
+                + applicationProperties.getWeatherApiKey()))
         .thenReturn(mockRequestHeaderSpec);
     when(mockRequestHeaderSpec.retrieve()).thenReturn(mockResponseSpec);
-    when(mockResponseSpec.bodyToFlux(Integer.class)).thenReturn(Flux.range(0, expectedFeedSize));
-    // Each of the URI method calls needs to be mocked.
-    for (int i = 0; i < expectedFeedSize; i++) {
-      when(mockRequestHeadersUriSpec.uri(
-              "https://hacker-news.firebaseio.com/v0/item/" + i + ".json"))
-          .thenReturn(mockRequestHeaderSpec);
-    }
-    when(mockResponseSpec.bodyToFlux(HackerNewsData.class)).thenReturn(Flux.just(mockData));
+    when(mockResponseSpec.bodyToFlux(WeatherData.class)).thenReturn(Flux.just(mockData));
 
     // act
-    Flux<HackerNewsData> result = subject.getFeed();
+    Flux<WeatherData> result = subject.getFeed();
     // assert
     assertEquals(expectedFeedSize, result.collectList().block().size());
   }

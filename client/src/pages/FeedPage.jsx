@@ -1,60 +1,25 @@
 import React from 'react';
-import {
-  AppBar,
-  Container,
-  Grid,
-  IconButton,
-  CircularProgress,
-  Button,
-} from '@material-ui/core';
-import { makeStyles } from '@material-ui/core/styles';
-import ExitToAppIcon from '@material-ui/icons/ExitToApp';
-import AppsRoundedIcon from '@material-ui/icons/AppsRounded';
-import ViewStreamRoundedIcon from '@material-ui/icons/ViewStreamRounded';
-import { Link } from 'react-router-dom';
+import StackGrid from 'react-stack-grid';
+import { Waypoint } from 'react-waypoint';
+import { CircularProgress, makeStyles } from '@material-ui/core';
 import { MediaCard } from '../components/MediaCard';
 import { FilterBar } from '../components/FilterBar';
-import { SearchBox } from '../components/SearchBox';
+import { Header } from '../components/Header';
 import { getFeed } from '../common/api';
 
 const useStyles = makeStyles(theme => ({
   root: {
     backgroundColor: '#f5f5f5',
   },
-  title: {
-    color: 'white',
-  },
-  appBar: {
-    display: 'flex',
-    marginRight: theme.spacing(3),
-    marginLeft: theme.spacing(3),
-  },
-  appBarContents: {
-    display: 'flex',
-  },
-  container: {
-    marginTop: 30,
-  },
-  paperContainer: {
-    paddingLeft: 20,
-    paddingRight: 20,
-  },
-  item: {
-    display: 'flex',
-  },
-  card: {
-    flex: 1,
-  },
-  headerButtons: {
-    color: '#FFFFFF',
-  },
-  button: {
-    colour: '#FFFFFF',
-  },
   loader: {
     width: '100%',
     animationDuration: '550ms',
     marginTop: theme.spacing(2),
+  },
+  loaderContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: 20,
   },
 }));
 
@@ -64,109 +29,81 @@ export const FeedPage = () => {
   // state management
   const [layout, setLayout] = React.useState('grid');
   const [feed, setFeed] = React.useState([]);
-  const [loader, setLoader] = React.useState(true);
+  const [mappedFeed, setMappedFeed] = React.useState([]);
+  const [hasMore, setHasMore] = React.useState(true);
   const [filters, setFilters] = React.useState([
     'reddit',
     'hackernews',
     'github',
     'twitter',
   ]);
+  const [filterInit, setFilterInit] = React.useState(false);
   const [search, setSearch] = React.useState([]);
+
+  const feedsPerLoad = 20;
 
   // fetches data when page loads
   React.useEffect(() => {
     // synchronous function as recommended by react
     getFeed()
       .then(data => setFeed(data))
-      .then(() => setLoader(false))
+      .then(() => setFilterInit(true))
       .catch(error => console.error(error));
   }, []);
 
-  const handleClick = layoutSelected => {
-    setLayout(layoutSelected);
+  React.useEffect(() => {
+    let timer = setInterval(() => {
+      if (document.body.scrollHeight > window.screen.height) {
+        clearInterval(timer);
+      }
+      setMappedFeed(prevMap => [
+        ...prevMap,
+        ...feed.slice(prevMap.length, prevMap.length + feedsPerLoad),
+      ]);
+    }, 1500);
+  }, [feed]);
+
+  const onEnter = () => {
+    setMappedFeed(prevMap => [
+      ...prevMap,
+      ...feed.slice(prevMap.length, prevMap.length + feedsPerLoad),
+    ]);
+    if (mappedFeed.length >= feed.length && feed.length !== 0) {
+      setHasMore(false);
+    }
   };
 
   return (
     <div className={classes.root}>
-      <AppBar position="static">
-        <Grid
-          className={classes.appBar}
-          alignItems={'center'}
-          justify={'space-between'}
-        >
-          <div className={classes.appBarContents}>
-            <Button
-              className={classes.title}
-              variant="h6"
-              component={Link}
-              to={'feed'}
-            >
-              Feedr
-            </Button>
-            <Button
-              className={classes.title}
-              variant="h6"
-              component={Link}
-              to={'favourites'}
-            >
-              Favourites
-            </Button>
-            <SearchBox setSearch={setSearch} />
-          </div>
-          <div className={classes.appBarContents}>
-            <IconButton
-              onClick={() => handleClick(layout === 'grid' ? 'row' : 'grid')}
-              color="inherit"
-              className={classes.headerButtons}
-            >
-              {layout === 'grid' ? (
-                <ViewStreamRoundedIcon />
-              ) : (
-                <AppsRoundedIcon />
-              )}
-            </IconButton>
-            <IconButton
-              component={Link}
-              to={'/'}
-              color="inherit"
-              className={classes.headerButtons}
-            >
-              <ExitToAppIcon />
-            </IconButton>
-          </div>
-        </Grid>
-      </AppBar>
-
-      {!loader && <FilterBar setFilters={setFilters} />}
-
-      <Container className={classes.container}>
-        <Grid
-          container
-          direction={layout === 'grid' ? 'row' : 'column'}
-          spacing={3}
-          alignContent={'center'}
-          justify="center"
-        >
-          {loader && (
-            <CircularProgress className={classes.loader}></CircularProgress>
-          )}
-          {feed.map(
-            (item, i) =>
-              filters.includes(item.media) &&
-              // Only checking the mainText if there is text to check, untherwise it will come up as 'undefined'
-              (typeof item.mainText !== 'undefined'
-                ? item.mainText.toLowerCase().includes(search) ||
-                  item.username.toLowerCase().includes(search) ||
-                  item.title.toLowerCase().includes(search)
-                : item.username.toLowerCase().includes(search) ||
-                  item.title.toLowerCase().includes(search)) && (
-                <Grid item key={i} className={classes.item}>
-                  <MediaCard {...item} className={classes.card} />
-                </Grid>
-              )
-          )}
-        </Grid>
-      </Container>
+      <Header setLayout={setLayout} setSearch={setSearch} layout={layout} />
+      {filterInit && <FilterBar setFilters={setFilters} />}
+      <StackGrid
+        columnWidth={300}
+        gutterWidth={layout === 'grid' ? 20 : 300}
+        gutterHeight={20}
+      >
+        {mappedFeed.map(
+          (item, i) =>
+            filters.includes(item.media) &&
+            isSearchedPost(search, item) && <MediaCard {...item} />
+        )}
+      </StackGrid>
+      <Waypoint onEnter={onEnter} />
+      {hasMore && (
+        <div className={classes.loaderContainer}>
+          <CircularProgress className={classes.loader}></CircularProgress>
+        </div>
+      )}
     </div>
   );
+};
+
+const isSearchedPost = (search, item) => {
+  // Only checking the mainText if there is text to check, untherwise it will come up as 'undefined'
+  return !!item.mainText
+    ? item.mainText.toLowerCase().includes(search) ||
+        item.username.toLowerCase().includes(search) ||
+        item.title.toLowerCase().includes(search)
+    : item.username.toLowerCase().includes(search) ||
+        item.title.toLowerCase().includes(search);
 };

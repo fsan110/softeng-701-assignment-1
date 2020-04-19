@@ -1,11 +1,6 @@
 package com.feeder.server.controller;
 
-import com.feeder.server.model.DemoData;
-import com.feeder.server.model.GenericData;
-import com.feeder.server.model.GithubData;
-import com.feeder.server.model.HackerNewsData;
-import com.feeder.server.model.RedditData;
-import com.feeder.server.model.TwitterData;
+import com.feeder.server.model.*;
 import com.feeder.server.provider.FeedProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,11 +20,12 @@ public class MultiFeedController {
   @Autowired private FeedProvider<GithubData> githubFeedProvider;
   @Autowired private FeedProvider<HackerNewsData> hackerNewsFeedProvider;
   @Autowired private FeedProvider<TwitterData> twitterFeedProvider;
-
+  @Autowired private FeedProvider<CovidNineteenData> covidNineteenFeedProvider;
 
   @GetMapping("/")
   public Flux<? extends GenericData> multiFeedMixerFlow() {
-    return Flux.merge(redditFlow(), githubFlow(), hackerNewsFlow(), twitterFlow());
+    return Flux.merge(
+        redditFlow(), githubFlow(), hackerNewsFlow(), twitterFlow(), covidNineteenFlow());
   }
 
   @GetMapping("/reddit")
@@ -57,4 +53,8 @@ public class MultiFeedController {
     return Flux.just(DemoData.newBuilder().title("Cat").imageURI("http://cat.jpg").build());
   }
 
+  @GetMapping("/covid")
+  public Flux<CovidNineteenData> covidNineteenFlow() {
+    return covidNineteenFeedProvider.getFeed();
+  }
 }
